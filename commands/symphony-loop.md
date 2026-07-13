@@ -42,4 +42,5 @@ description: Symphony — 追跡中の全リポジトリを横断して Linear i
 # 実装時のルール
 - 最後に必ず review スキルをもとにコードを修正すること。これは Sonnet sub agent に頼らず、Opus であるあなた自身で行う。
 - フロントエンドの UI を修正する場合は apple-design スキルを読み込み、UI/UX を叩き込んでから行う。
-- 作業ログだけのコメント、swallow errors（バグを握りつぶし標準出力するだけの邪悪）、不要なフォールバック（動いているかのように見せかけバグを握りつぶす邪悪）は抹消する。
+- 作業ログだけのコメント、swallow errors（バグを握りつぶし標準出力するだけの邪悪）、不要なフォールバック（動いているかのように見せかけバグを握りつぶす邪悪）は抹消する。偽データ・偽 OCR・プレースホルダの捏造もしない（無いものは「無い」と明示。デモ/スクショは実データで撮る）。
+- **知見の反映**: review 後、loop 運用や実装で浮上した再発防止すべき知見・gotcha は `the-symphony/CLAUDE.md`（横断原則・Harness 知見）／ Claude memory ／ この loop 定義（`commands/symphony-loop.md`）に反映してから終える。詳細は the-symphony/CLAUDE.md の「知見の保存と呼び出し（KAZ-49）」を参照。
