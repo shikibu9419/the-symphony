@@ -2,7 +2,7 @@
 description: Symphony — 追跡中の全リポジトリを横断して Linear issue を消化するループを回す
 ---
 
-/loop 30m ループごとに以下を実行する。対象は「Linear で `symphony` ラベルかつ In Progress のプロジェクト」全体（＝追跡中の全リポジトリ）。**loop 全体で 1 つ**であり、プロジェクトごとに loop を分けない。Linear へのアクセスは全て `linear` CLI（linear-cli）で行い、MCP は使わない。
+/loop 30m ループごとに以下を実行する。対象は「Linear で `symphony` ラベルかつ In Progress のプロジェクト」全体（＝追跡中の全リポジトリ）。**loop 全体で 1 つ**であり、プロジェクトごとに loop を分けない。Linear へのアクセスは全て `linear` CLI（linear-cli）で行い、MCP は使わない（**書き込み actor は linear-cli の既定 profile = cosmo-agent、必ず agent 名義で行うこと。個人アカウントでは書き込まない**）。
 
 # 0. 対象の列挙とコンテキスト分離
 - 追跡中プロジェクト一覧を取得する:
