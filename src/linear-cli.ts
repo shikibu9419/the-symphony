@@ -64,17 +64,5 @@ export function issueTexts(identifier: string): (string | null | undefined)[] {
 
 /** `linear issue create --title T --team K [--project P] --description D` */
 export function issueCreate(title: string, team: string, project: string, description: string): RunResult {
-  return run([
-    LINEAR_BIN,
-    "issue",
-    "create",
-    "--title",
-    title,
-    "--team",
-    team,
-    "--project",
-    project,
-    "--description",
-    description,
-  ]);
+  return run([LINEAR_BIN, "issue", "create", "--title", title, "--team", team, "--project", project, "--description", description]);
 }

@@ -1,7 +1,7 @@
 // issue の冪等作成 / project update 投稿 / status 変更 / CLAUDE.md 生成 /
 // リポジトリ作成 / プロジェクト処理。
 
-import { mkdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { DESIGN_ISSUE_TITLE, DIRTY_ISSUE_TITLE, DRY, OWNER } from "./constants";
 import { issueCreate, linearGraphql, listIssues, run } from "./linear-cli";
@@ -106,6 +106,19 @@ function writeClaudeMd(path: string, proj: LinearProject, orgUrlKey: string): vo
   writeFileSync(join(path, "CLAUDE.md"), content);
 }
 
+function ensureClaudeMd(path: string, proj: LinearProject, orgUrlKey: string): void {
+  if (existsSync(join(path, "CLAUDE.md"))) {
+    log("  CLAUDE.md already exists — skip");
+    return;
+  }
+  if (DRY) {
+    log("  [dry] would write CLAUDE.md");
+    return;
+  }
+  writeClaudeMd(path, proj, orgUrlKey);
+  log("  wrote CLAUDE.md");
+}
+
 function createRepo(repoFull: string, path: string, proj: LinearProject, orgUrlKey: string): void {
   if (DRY) {
     log(`  [dry] would create ${path} + git init + jj git init --colocate + CLAUDE.md`);
@@ -150,6 +163,7 @@ export function processProject(proj: LinearProject, root: string, orgUrlKey: str
   const path = join(root, "github.com", repoFull);
   if (isDir(path)) {
     log(`'${name}': -> ${repoFull} (既存パス, 作成スキップ)`);
+    ensureClaudeMd(path, proj, orgUrlKey);
   } else {
     log(`'${name}': -> ${repoFull} (新規作成)`);
     createRepo(repoFull, path, proj, orgUrlKey);
