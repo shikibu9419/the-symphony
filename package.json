@@ -1,0 +1,15 @@
+{
+  "name": "symphony-setup",
+  "version": "1.0.0",
+  "description": "Linear の symphony ラベル & Backlog プロジェクトを走査し、リポジトリを作成/追跡する (linear-repo-sync.py の TypeScript 移植)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "bun run src/index.ts",
+    "build": "bun build --compile --outfile ~/.local/bin/symphony-setup src/index.ts",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.0"
+  }
+}
