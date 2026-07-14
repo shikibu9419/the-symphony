@@ -1,20 +1,20 @@
-// repo 名解決ロジック (slugify / normalize / directive 探索 / 確定 issue 読み取り /
-// resolve / team 解決)。
+// Linear プロジェクトから repo フルネーム (owner/name) と team を解決する。
 
-import { CLEAN_RE, DIRTY_ISSUE_TITLE, OWNER, REPO_DIRECTIVE_RE, TEAM_FALLBACK } from "./constants";
-import { issueTexts, listIssues } from "./linear-cli";
+import { CLEAN_RE, DIRTY_ISSUE_TITLE, OWNER, REPO_DIRECTIVE_RE } from "./config";
+import { issueTexts, listIssues } from "./linear";
 import type { LinearProject } from "./types";
 
-export function slugify(name: string): string {
+function slugify(name: string): string {
   const s = name.trim().toLowerCase().replace(/\s+/g, "-");
   return s.replace(/-+/g, "-").replace(/^-+|-+$/g, "");
 }
 
+// owner 省略 (`/` 無し) なら OWNER を前置する。`repo:` 明示と start-tracking の repo 引数で共用。
 export function normalizeRepo(value: string): string {
   return value.includes("/") ? value : `${OWNER}/${value}`;
 }
 
-export function findDirective(...texts: (string | null | undefined)[]): string | null {
+function findDirective(...texts: (string | null | undefined)[]): string | null {
   for (const t of texts) {
     if (t) {
       const m = REPO_DIRECTIVE_RE.exec(t);
@@ -27,10 +27,10 @@ export function findDirective(...texts: (string | null | undefined)[]): string |
 }
 
 /** 「リポジトリ名の確定」issue の説明 or コメントに書かれた repo: 明示を読む。 */
-export function confirmedRepoFromIssue(projectName: string): string | null {
-  for (const i of listIssues(projectName)) {
+async function confirmedRepoFromIssue(projectName: string): Promise<string | null> {
+  for (const i of await listIssues(projectName)) {
     if (i.title === DIRTY_ISSUE_TITLE) {
-      return findDirective(...issueTexts(i.identifier));
+      return findDirective(...(await issueTexts(i.identifier)));
     }
   }
   return null;
@@ -43,12 +43,12 @@ export function confirmedRepoFromIssue(projectName: string): string | null {
  * issue チェックを slug より前に置くのは意図的で、clean 名のプロジェクトでも issue に
  * `repo:` を書けば slug を上書きできるようにするため (この順序を入れ替えると上書きが効かなくなる)。
  */
-export function resolveRepo(proj: LinearProject): string | null {
+export async function resolveRepo(proj: LinearProject): Promise<string | null> {
   const fromContent = findDirective(proj.content, proj.description);
   if (fromContent) {
     return fromContent;
   }
-  const fromIssue = confirmedRepoFromIssue(proj.name);
+  const fromIssue = await confirmedRepoFromIssue(proj.name);
   if (fromIssue) {
     return fromIssue;
   }
@@ -59,6 +59,9 @@ export function resolveRepo(proj: LinearProject): string | null {
 }
 
 export function teamOf(proj: LinearProject): string {
-  const teams = proj.teams?.nodes ?? [];
-  return teams[0]?.key ?? TEAM_FALLBACK;
+  const key = proj.teams?.nodes?.[0]?.key;
+  if (!key) {
+    throw new Error(`プロジェクト '${proj.name}' に team が無く issue を作成できません。`);
+  }
+  return key;
 }

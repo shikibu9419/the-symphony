@@ -1,0 +1,19 @@
+{
+  "name": "linear-cli",
+  "version": "0.1.0",
+  "description": "Self-contained Linear GraphQL CLI. Keeps the API key out of agents' hands.",
+  "type": "module",
+  "bin": {
+    "linear": "./src/index.ts"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./lib": "./src/lib.ts"
+  },
+  "scripts": {
+    "dev": "bun run src/index.ts"
+  },
+  "engines": {
+    "bun": ">=1.1.0"
+  }
+}

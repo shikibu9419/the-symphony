@@ -15,6 +15,8 @@ function timestamp(d: Date): string {
   return `${y}-${mo}-${day}T${h}:${mi}:${s}`;
 }
 
+// 進捗ログは stderr に出す。stdout は「結果」(sync のサマリ / start-tracking の owner/repo)
+// 専用にして、呼び出し側がパイプで結果だけ取れるようにする。
 export function log(msg: string): void {
-  console.log(`[${timestamp(new Date())}] ${msg}`);
+  console.error(`[${timestamp(new Date())}] ${msg}`);
 }

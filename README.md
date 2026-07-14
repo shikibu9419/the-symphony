@@ -4,71 +4,99 @@ my own [symphony](https://github.com/openai/symphony) = Claude Code `/loop` + [l
 
 Linear で `symphony` ラベルの付いたプロジェクトを「追跡対象」とし、
 
-- **symphony-setup**: `symphony` ラベル × `Backlog` のプロジェクトを走査し、新規を ghq リポジトリとして自動作成・追跡する（repo 作成・CLAUDE.md 生成・追跡開始 update・In Progress 化）。
-- **symphony-loop**: 追跡中（In Progress）の全リポジトリを横断し、Linear の issue をコメントベースで消化していくループ（Claude Code の `/loop` で回す）。設計 issue の起票や実装の判断はここでエージェントが行う。
+- **symphony sync**: `symphony` ラベル × `Backlog` のプロジェクトを走査し、新規を ghq リポジトリとして自動作成・追跡する（repo 作成・AGENTS.md 生成・追跡開始 update・In Progress 化）。
+- **ループ**: 追跡中（In Progress）の全リポジトリを横断し、Linear の issue をコメントベースで消化していく（Claude Code の `/loop` で回す）。初期 issue の要否/種類（目的/設計/不要）の判断や実装はここでエージェントが行う。
 
 を組み合わせて、「Linear でやり取りしながら複数プロジェクトの実装・修正・再デプロイを回す」ことを目指す。
 
-symphony-setup は常駐せず、**symphony-loop の冒頭で毎回1回だけ実行される**（詳細は [`LOOP.md`](./LOOP.md)）。
-
-## クイックスタート
-
-```sh
-# 1. 事前準備（下記）を揃える
-# 2. repo をどの GitHub owner の下に作るかを設定する
-git config --global ghq.user <your-github-username>
-# 3. clone して配置する
-git clone https://github.com/shikibu9419/the-symphony
-cd the-symphony
-bash scripts/deploy.sh
-# 4. Claude Code で /symphony-loop を実行する（または cron / /schedule で定期実行する）
-```
+symphony sync は常駐せず、**ループの冒頭で毎回1回だけ実行される**（手順は [`LOOP.md`](./LOOP.md)）。
 
 ## 事前準備
 
 - [bun](https://bun.sh)
 - [ghq](https://github.com/x-motemen/ghq)
 - [jj](https://github.com/jj-vcs/jj)（新規 repo を colocated init するのに使う）
-- Claude Code（`/symphony-loop` を回す）
-- linear-cli（公開予定の私のオリジナル CLI ツール。OAuth の agent actor を profile に登録して使う）
+- Claude Code（`/loop` でループを回す）
+
+linear-cli（OAuth の agent actor を profile に登録して使う私のオリジナル CLI）は
+この repo の [`linear/`](./linear) に同梱してある（別 clone は不要）。`install.sh` が
+`linear` バイナリをビルドし、symphony sync 本体は同じ lib を in-process import する。
+
+## クイックスタート
+
+```sh
+# Add your config
+git config --global symphony.user <your-github-username>
+git config --global symphony.linearProfile <your-linear-cli-profile>
+# Clone and deploy
+git clone https://github.com/shikibu9419/the-symphony
+cd the-symphony
+bash install.sh
+```
+
+初回は linear-cli の profile に OAuth の agent actor を登録しておくこと
+（`linear auth login --oauth --profile <name>` → GUI 側で `auth callback`）。その profile 名を
+`symphony.linearProfile` に設定する。
+
+Claude Code でループを回す（例: 毎日 8/12/18時に実行）:
+
+```
+/loop 0 8/12/18 * * * @LOOP.md の通りにイテレーションを開始
+```
 
 ## 設定（git config）
 
-repo を作る owner や対象ラベルは git config で指定する（環境変数でも上書き可）。
+owner・対象ラベル・linear profile は git config で指定する。
 
 | キー | 意味 | 既定 / フォールバック |
 |---|---|---|
-| `symphony.user` | repo を作る GitHub owner | 無ければ `ghq.user` |
-| `ghq.user` | 〃（ghq 純正の owner 補完キー） | — |
+| `symphony.user` | repo を作る GitHub owner | 無ければ `ghq.user`（どちらも無ければ実行時エラー） |
+| `symphony.linearProfile` | Linear アクセスに使う linear-cli の profile（actor） | 無ければ実行時エラー |
 | `symphony.label` | 追跡対象とみなす Linear ラベル | `symphony` |
+| `symphony.issueLimit` | 1回の実行で拾う open issue の上限（追跡中プロジェクト横断、updatedAt 降順） | `5` |
+| `symphony.staleDays` | last:agent でも最終コメントがこの日数を超えて古ければ「停滞」として出す（`0` で無効） | `7` |
 
-環境変数 `SYMPHONY_OWNER` / `SYMPHONY_LABEL` が最優先。owner がどこからも解決できない場合は実行時にエラーで止まる（誤った owner の下に repo を作らないための fail-loud）。
+owner / linear profile がどこからも解決できない場合は実行時にエラーで止まる（誤った owner の下に repo を作ったり、誤った actor で書き込んだりしないための fail-loud）。
+
+Linear の読み書きは、この `symphony.linearProfile` を linear-cli の lib 呼び出しに
+**明示で渡す**（環境変数は使わない）。cwd の `.linear-cli.json` 由来の profile に依存せず、
+常に同じ actor 名義で行うためのフェイルセーフ。
 
 ## 仕組み
 
-- `src/` — symphony-setup 本体（bun + TypeScript）。`symphony` ラベル × `Backlog` を走査し、repo 名を解決して新規プロジェクトを取り込む。冪等チェック・status 変更・project update といった JSON/GraphQL 処理を担う。Linear アクセスは全て linear-cli 経由（agent 名義）。repo 作成の機械処理は `scripts/create-repo.sh` に委譲する。
-- `scripts/create-repo.sh` — `<ghq root>/github.com/<owner>/<repo>` を作って `git init` + `jj git init --colocate`、`templates/CLAUDE.md` から CLAUDE.md を生成する（冪等）。
-- `templates/CLAUDE.md` — 新規リポジトリに設置する CLAUDE.md テンプレート。
-- `LOOP.md` — **ループ手順の正典**。`/symphony-loop` コマンドと cron はどちらもこれを読み込んで実行する。冒頭で symphony-setup を実行し、設計 issue の動的起票や実装もここで行う。ループのクエリ・手順を変えるときはここを編集する。
-- `commands/symphony-loop.md` — `/symphony-loop` スラッシュコマンド定義（LOOP.md を読んで1回実行する）。
-- `scripts/deploy.sh` — ビルドと配置を行う（下記）。
+Linear へのアクセスは二面ある: **symphony sync 本体は `linear-cli/lib` を in-process import**
+して直接叩き、**ループの sub agent は `linear` CLI バイナリ**を叩く。どちらも同じ `linear/` の
+コードを共有する（monorepo）。
 
-## デプロイ
+- `linear/` — 取り込んだ [linear-cli](https://linear.app/)（self-contained な Linear GraphQL CLI）。`src/lib.ts` に `listIssues`/`getIssue`/`createIssue`/`createComment` と `graphql` passthrough を切り出し、`src/commands/*` はそれを呼ぶ薄い CLI 層。`install.sh` が `~/.local/bin/linear` にビルドし、ループの sub agent が使う。API キーはバイナリ内に隠れ、agent の手には渡らない。
+- `src/sync.ts` — `~/.local/bin/symphony/sync` 本体（末尾の `import.meta.main` がエントリ）。`symphony` ラベル × `Backlog` を走査し、repo 名を解決できれば追跡を開始（`startTracking`）、できなければ `リポジトリ名の確定` issue 起票 + `offTrack` の project update（**機械処理のみ**。初期 issue の要否などの判断は loop = LOOP.md）。最後に追跡中プロジェクトの open issue（＋最終コメントが user 由来か）を stdout に一覧する。
+- `src/start-tracking.ts` — repo 確定後の追跡開始（repo 作成 → `onTrack` の追跡開始 update → In Progress 化）。sync 内から呼ばれるほか、`~/.local/bin/symphony/start-tracking <project> <repo>` として単体でも起動でき（Claude が repo 名確定後に直接呼ぶ）、解決した `<owner>/<repo>` を stdout に返す。
+- `src/lib/` — 汎用の葉モジュール。`linear.ts`（`linear-cli/lib` を profile 明示で叩くラッパ）、`repo-resolve.ts`（repo 名解決）、`config.ts` / `log.ts`（進捗は stderr）/ `types.ts` / `subprocess.ts`。
+- `templates/AGENTS.md` — 新規リポジトリに設置する AGENTS.md テンプレート（ビルド時にバイナリへ埋め込まれる）。
+- `LOOP.md` — ループ手順。冒頭で symphony sync を実行し、初期 issue の要否/種類判断や実装もここで行う。手順・クエリを変えるときはここを編集する。
+- `install.sh` — ビルドと配置を行う（下記）。
 
-```sh
-bash scripts/deploy.sh
-```
+## Linear のセットアップ（agent actor）
 
-`deploy.sh` は以下を行う（定期実行の常駐は仕込まない。実行は symphony-loop の冒頭に任せる）：
+`install.sh` の後に、Linear へ書き込む actor を用意する。Personal API Key は常に **その所有者（人間）** として振る舞うので、issue やコメントを **エージェント名義** で残すには Linear の **OAuth application を `actor=app`** で使う（＝アプリ自身が actor になる）。symphony はこの profile を `symphony.linearProfile` に設定して使う。
 
-1. `bun install` で依存を解決。
-2. `bun build --compile` で `src/index.ts` を単一バイナリにして `~/.local/bin/symphony-setup` へ出力。
-3. `commands/symphony-loop.md` の `{{LOOP_MD}}` をこの repo の LOOP.md 絶対パスへ置換して `~/.claude/commands/symphony-loop.md` に配置。
-4. `scripts/create-repo.sh` と `templates/CLAUDE.md` を `~/.local/libexec/symphony/` に配置（バイナリから参照する）。
+1. **OAuth application を作る**（一度だけ）: Linear の Settings → API → **OAuth applications** で新規作成。redirect に `http://localhost:8788/callback` を入れる。メンション/アサイン可能な agent にするには、そのアプリの **agent capability** と `app:*` スコープも有効化する。
+2. **CLI に app 情報を渡す**: `~/.config/linear-cli/oauth.json` を作る（または対応する env）:
+   ```json
+   { "clientId": "...", "clientSecret": "...", "redirectUri": "http://localhost:8788/callback", "actor": "app" }
+   ```
+3. **agent profile でログイン**（`actor=app` が既定 = エージェント名義）:
+   ```sh
+   linear auth login --oauth --profile <agent-profile>
+   # ローカル(GUI): ブラウザが開いて callback を自動取得。
+   # SSH/headless: authorize URL が表示される → 自分の Mac で開いて承認 → redirect URL を貼る:
+   linear auth callback 'http://localhost:8788/callback?code=...&state=...'
+   ```
+   ⚠️ Keychain 書き込みは GUI ログインした Mac 本体の Terminal で行う（SSH だと `User interaction is not allowed`）。
+4. **確認**: `linear auth status --profile <agent-profile>` → `viewer` に agent が出れば OK（`name` は表示名で、profile 名とは別物）。
+5. **symphony に profile を教える**: `git config --global symphony.linearProfile <agent-profile>`。以降 symphony の読み書きは全てこの actor 名義で行われる。
 
-## 運用
-
-symphony-setup は symphony-loop の冒頭で毎回実行される。ループ自体の起動は Claude Code の `/symphony-loop`（手動）か、cron / `/schedule` などで定期実行する（例: 毎日 8/12/18時）。
+（`<agent-profile>` は linear-cli の profile 名 = Keychain のアカウント名。表示名ではなく、自分で付けた profile 名を使う。）
 
 ## 謝辞
 
