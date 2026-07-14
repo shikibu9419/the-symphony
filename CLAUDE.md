@@ -1,5 +1,7 @@
 # The Symphony
 
+> **ループ手順は [`LOOP.md`](./LOOP.md) が正典。** `/symphony-loop` コマンドと cron（毎日 8/12/18時）はどちらも LOOP.md を読み込んで実行する。ループのクエリ・手順を変えるときは LOOP.md を編集する。
+
 ## Linear
 
 This repository is bound to the Linear project **The Symphony**.
