@@ -33,7 +33,7 @@
    2.2) Sonnet の sub agent に計画を提示し、実装・動作確認・網羅的テストをさせる（実装ルール徹底）。
    2.3) review スキルでリファクタ。swallow errors や作業ログコメントは特に抹消。必要なら再度 sub agent。
    2.4) 十分にテスト・リファクタしたら `jj desc`（変更箇所と目的を詳細に）＋ `jj new` で change 保存。
-   2.5) 該当 issue に change ID・変更内容を投稿（フロントの見た目を修正した場合 playwright でスクショを撮）。status を `In Review` に変更。
+   2.5) 該当 issue に change ID・変更内容を投稿（フロントの見た目を修正した場合 playwright でスクショを撮って共有すること）。status を `In Review` に変更。
    2.6) ユーザの動作確認待ち。変更要望が来たら該当 change ID に適用する形で修正（jj log の時系列をなるべく保つ。分割指示があれば新規 change）。
 
 ## 実装時のルール
