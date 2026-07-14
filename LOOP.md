@@ -4,10 +4,12 @@
 
 対象は「Linear で `symphony` ラベルかつ In Progress のプロジェクト」全体（＝追跡中の全リポジトリ）。**ループ全体で1つ**であり、プロジェクトごとにループを分けない。Linear へのアクセスは全て `linear` CLI（linear-cli）で行い、MCP は使わない（**書き込み actor は linear-cli の既定 profile = cosmo-agent、必ず agent 名義で行うこと。個人アカウントでは書き込まない**）。
 
-## 0. 対象の列挙とコンテキスト分離
-- 追跡中プロジェクト一覧を取得する:
+## 0. 新規プロジェクトの取り込みと対象の列挙
+- **毎回まず `~/.local/bin/symphony-setup` を1回実行する。** これは Linear の `symphony` ラベル（`git config symphony.label` で変更可・既定 `symphony`）× `Backlog` のプロジェクトを走査し、新規があれば `scripts/create-repo.sh` 経由で repo 作成（`git init` + `jj git init --colocate` + CLAUDE.md 生成）・追跡開始 project update・status を In Progress に変更する。**設計 issue はここでは作らない**（下記 1-2 でエージェントが description の充足度を見て動的に作る）。
+- symphony-setup が exit≠0 で失敗したら握りつぶさず報告し、原因（owner 未解決 = `git config --global ghq.user` / `symphony.user` / `SYMPHONY_OWNER` 未設定、など）を解消してから続ける。
+- その後、追跡中プロジェクト一覧を取得する:
   `linear graphql 'query { projects(filter:{ labels:{name:{eq:"symphony"}}, status:{name:{eq:"In Progress"}} }){ nodes { id name } } }'`
-- 各プロジェクトはローカルの ghq リポジトリ `~/projects/github.com/shikibu9419/<repo>` に対応し、その repo の CLAUDE.md に Linear プロジェクトの紐付けが書いてある。
+- 各プロジェクトはローカルの ghq リポジトリ `<ghq root>/github.com/<owner>/<repo>`（ghq root は `git config ghq.root`、owner は `SYMPHONY_OWNER`／`gh api user`）に対応し、その repo の CLAUDE.md に Linear プロジェクトの紐付けが書いてある。
 - **リポジトリごとに Sonnet の sub agent を割り当てて処理し、コンテキストを混ぜない。** 親（Opus）はオーケストレーションと最終レビューに徹する。各 sub agent には「担当 repo のパス」「担当 Linear プロジェクト名」を渡し、そこから issue 状況を自分で取得させる。
 - **assignee が付いている issue には手をつけない**（人間が対応中とみなす）。issue 列挙時に assignee 付きを除外する。
 - The Symphony 自身も対象に含まれる（自己改善するため）。
@@ -17,8 +19,9 @@
 ## 1. Linear の情報整理（ここではコード変更を一切しない）
 0) その repo で実装中のものがあれば実装に専念し、情報整理はスキップする。
 1) 担当プロジェクトの `Backlog` / `In Progress` / `In Review` の issue を `linear issue list --project "<name>" --state <state>` で取得し内容を確認する。**各 issue の全コメントを `linear issue get <ID>` で取得し、`createdAt` 昇順で最初から最後まで読む**（最後の1件だけを見ない。`comments(last:1)` は順序が不正確なので使わない）。ユーザが連続で複数コメントしている場合、途中のコメントを取りこぼさない。
-2) **setup 由来の issue（`リポジトリ名の確定` / `プロジェクト設計の確定`）を最優先で確認する:**
-   - これらの issue は symphony-setup が立て、ユーザがコメントで指示を書く。現状の issue 対応と同じ要領でコメントを拾って進める。
+2) **repo 名確定 / 設計確定の issue（`リポジトリ名の確定` / `プロジェクト設計の確定`）を最優先で確認する:**
+   - `リポジトリ名の確定` は symphony-setup が立てる（repo 名を自動決定できなかった時）。ユーザのコメント指示（`repo: <owner>/<name>`）を拾って進める。
+   - **`プロジェクト設計の確定` issue が無ければ、エージェントが動的に作成する**（symphony-setup は作らない）: プロジェクトの description / content を読み、設計がどこまで固まっているかを評価する。そのうえで **description で既に決まっていることは「確認済み」として扱い、本当に詰めるべき点だけ**を first コメントとして問う。洗い出す論点の例: スコープ / ゴール、アーキテクチャと技術選定、最初のマイルストーンと分解 issue、未確定の判断事項。固定テンプレの貼り付けはしない（プロジェクトの実態に即して具体的に書く）。作成は agent 名義（linear-cli）で title は `プロジェクト設計の確定`。
    - `プロジェクト設計の確定` が未完（未 Done）の間は、**そのプロジェクトの他 issue の実装には着手しない。** 設計をユーザと詰めることに集中し、コメントに応じて設計方針を更新・返信する。
    - 設計が確定（issue が Done）したら 2. の実装フェーズに進む。
 3) ユーザも自分もコメントしていない新規 issue には、現状の実装や状況を調査し実装方針をコメント送信する。

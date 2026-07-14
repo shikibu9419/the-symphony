@@ -4,9 +4,10 @@
 import { LINEAR_BIN } from "./constants";
 import type { LinearIssueDetail, LinearIssueSummary, RunResult } from "./types";
 
-export function run(cmd: string[], opts: { cwd?: string } = {}): RunResult {
+export function run(cmd: string[], opts: { cwd?: string; env?: Record<string, string> } = {}): RunResult {
   const proc = Bun.spawnSync(cmd, {
     cwd: opts.cwd,
+    env: opts.env,
     stdout: "pipe",
     stderr: "pipe",
   });
